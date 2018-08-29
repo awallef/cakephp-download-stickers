@@ -8,6 +8,8 @@ class StickersController extends AppController
 {
   public function create()
   {
-    debug(sscanf("#ff9900", "#%02x%02x%02x"));
+    $pdf = new StickersPDF();
+    $pdf->drawOneStricker()
+    ->save();
   }
 }
