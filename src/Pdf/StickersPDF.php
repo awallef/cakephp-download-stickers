@@ -3,7 +3,6 @@ namespace App\Pdf;
 
 use Cake\Core\InstanceConfigTrait;
 use Cake\Filesystem\Folder;
-use FPDF;
 
 class StickersPDF
 {
@@ -31,13 +30,18 @@ class StickersPDF
     'sticker' => [
       'width' => 74,
       'height' => 105,
-      'background' => WWW_ROOT.'img'.DS.'chucknorris.png',
+      'background' => WWW_ROOT.'img'.DS.'front.jpg',
     ],
 
     'cropMarks' => [
       'innerCrop' => 5,
       'length' => 7
     ],
+
+    'margins' => [
+      'left' => 5,
+      'bottom' => 5
+    ]
 
   ];
 
@@ -48,7 +52,7 @@ class StickersPDF
   {
     $this->setConfig($config);
 
-    $this->pdf = new FPDF($this->getConfig('pdf.orientation'), $this->getConfig('pdf.unit'), $this->getConfig('pdf.size'));
+    $this->pdf = new PDF($this->getConfig('pdf.orientation'), $this->getConfig('pdf.unit'), $this->getConfig('pdf.size'));
     $this->pdf->SetTitle($this->getConfig('pdf.title'));
     $this->pdf->SetAuthor($this->getConfig('pdf.author'));
     $this->pdf->SetAutoPageBreak(true);
@@ -69,13 +73,40 @@ class StickersPDF
 
   public function drawOneStricker()
   {
-    $this->pdf->Image($this->sticker->getBackground(), 0, 0, $this->sticker->getWidth());
+    $this->_drawStricker();
+    $nextX = $this->pdf->GetX() +  $this->getConfig('margins.left') + $this->sticker->getWidth();
+    $nextY = $this->pdf->GetY() +  $this->getConfig('margins.bottom') + $this->sticker->getHeight();
+
+    $enoughWidth = $nextX + $this->sticker->getWidth() <= $this->pdf->GetRightMarginPos();
+    $enoughHeight = $nextY + $this->sticker->getHeight() <= $this->pdf->GetBottomMarginPos();
+
+    $this->pdf->SetX($nextX);
+
+    if(!$enoughWidth)
+    {
+      $this->pdf->SetX($this->pdf->GetLeftMarginPos());
+      $this->pdf->SetY($nextY, false);
+    }
+    if(!$enoughHeight && !$enoughWidth)
+    {
+      $this->pdf->SetX($this->pdf->GetLeftMarginPos());
+      $this->pdf->SetY($this->pdf->GetTopMarginPos(), false);
+      $this->pdf->AddPage();
+    }
+
     return $this;
   }
 
-  public function setSticker($background,$width, $height)
+  public function setSticker($width, $height,$background)
   {
     $this->sticker->setbackground($background)->setWidth($width)->setHeight($height);
+
+    $minMargins = 16;
+    $number = floor(($this->pdf->GetPageWidth() - $minMargins) / $width);
+    $number = floor(($this->pdf->GetPageWidth() - $minMargins - ($number - 1) * $this->getConfig('margins.left')) / $width);
+    $margin = $this->pdf->GetPageWidth() - ( $number * $width ) - ( ($number - 1) * $this->getConfig('margins.left') );
+    $this->pdf->SetTheMargins($margin/2, 10);
+
     return $this;
   }
 
@@ -96,5 +127,13 @@ class StickersPDF
   public function hexToArray($hex)
   {
     return sscanf($hex, "#%02x%02x%02x");
+  }
+
+  // protected
+
+  protected function _drawStricker()
+  {
+    $this->pdf->Image($this->sticker->getBackground(), $this->pdf->GetX(), $this->pdf->GetY(), $this->sticker->getWidth());
+    return $this;
   }
 }
